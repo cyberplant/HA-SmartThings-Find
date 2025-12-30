@@ -63,7 +63,7 @@ class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         
         # We store the state/verifier in hass.data in stage_one, so we are good.
         
-        return self.async_step_auth_code(login_url=login_url)
+        return await self.async_step_auth_code(login_url=login_url)
 
     async def async_step_auth_code(self, user_input=None, login_url=None):
         """Step where user enters the redirect URL."""
