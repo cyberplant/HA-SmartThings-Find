@@ -114,37 +114,27 @@ class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
     
-    # Second step: Wait until QR scanned and log in
+    # Second step: Show QR code and wait for user to scan
     async def async_step_auth_stage_two(self, user_input=None):
-        """Handle OAuth2 authentication completion."""
-        if not self.task_stage_two:
-            self.task_stage_two = self.hass.async_create_task(self.do_stage_two())
+        """Show QR code for authentication."""
+        _LOGGER.debug(f"async_step_auth_stage_two called with user_input: {user_input}")
         
-        if not self.task_stage_two.done():
-            return self.async_show_progress(
-                progress_action="task_stage_two",
-                progress_task=self.task_stage_two,
-                description_placeholders={
-                    "qr_code": gen_qr_code_base64(self.qr_url),
-                    "url": self.qr_url,
-                    "code": self.qr_url.split('/')[-1] if self.qr_url else "Unknown",
-                }
-            )
+        if user_input is not None:
+            # User clicked continue - for now, fall back to manual entry
+            # In the future, we could poll for completion here
+            return await self.async_step_finish()
         
-        # Check if stage two completed successfully
-        if self.error:
-            return self.async_show_form(
-                step_id="auth_choice",
-                data_schema=vol.Schema({
-                    vol.Required("auth_method", default="manual"): vol.In({
-                        "oauth2": "QR Code Authentication (Recommended)",
-                        "manual": "Manual JSESSIONID Entry"
-                    })
-                }),
-                errors={"base": self.error}
-            )
+        # Show form with QR code info
+        _LOGGER.debug(f"Showing QR code form, URL: {self.qr_url[:50] if self.qr_url else 'None'}...")
         
-        return self.async_show_progress_done(next_step_id="finish")
+        return self.async_show_form(
+            step_id="auth_stage_two",
+            data_schema=vol.Schema({}),
+            description_placeholders={
+                "qr_url": self.qr_url or "Error generating QR URL",
+                "message": "Scan the QR code with your Samsung device, or copy the URL. After authenticating, click Submit to continue with manual JSESSIONID entry."
+            }
+        )
 
     async def async_step_user(self, user_input=None):
         """Start the authentication flow."""
@@ -159,9 +149,25 @@ class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             _LOGGER.debug(f"Selected auth method: {auth_method}")
             
             if auth_method == "oauth2":
-                # Start OAuth2 flow
-                _LOGGER.debug("Starting OAuth2 flow - moving to auth_stage_one")
-                return await self.async_step_auth_stage_one()
+                # Start OAuth2 flow - do initialization directly
+                _LOGGER.debug("Starting OAuth2 flow")
+                await self.do_stage_one()
+                
+                if self.error:
+                    _LOGGER.error(f"OAuth2 init failed: {self.error}")
+                    return self.async_show_form(
+                        step_id="auth_choice",
+                        data_schema=vol.Schema({
+                            vol.Required("auth_method", default="manual"): vol.In({
+                                "oauth2": "QR Code Authentication (Recommended)",
+                                "manual": "Manual JSESSIONID Entry"
+                            })
+                        }),
+                        errors={"base": "auth_failed"}
+                    )
+                
+                # Move to stage two (show QR code)
+                return await self.async_step_auth_stage_two()
             else:
                 # Use manual JSESSIONID entry
                 _LOGGER.debug("Using manual JSESSIONID entry - moving to finish")
@@ -181,47 +187,6 @@ class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "message": "Choose your preferred authentication method. QR code authentication is more secure and easier to use."
             }
         )
-
-    async def async_step_auth_stage_one(self, user_input=None):
-        """Handle OAuth2 authentication initialization."""
-        _LOGGER.debug(f"async_step_auth_stage_one called with user_input: {user_input}")
-        
-        if user_input is not None:
-            # This shouldn't happen, but just in case
-            return await self.async_step_auth_stage_one()
-        
-        if not self.task_stage_one:
-            _LOGGER.debug("Creating task_stage_one")
-            self.task_stage_one = self.hass.async_create_task(self.do_stage_one())
-        
-        return self.async_show_progress(
-            progress_action="task_stage_one",
-            progress_task=self.task_stage_one,
-            description_placeholders={
-                "message": "Initializing OAuth2 authentication..."
-            }
-        )
-
-    async def async_progress_task_stage_one(self, user_input=None):
-        """Handle completion of OAuth2 authentication initialization."""
-        _LOGGER.debug("async_progress_task_stage_one called")
-        
-        # Check if stage one completed successfully
-        if self.error:
-            _LOGGER.debug(f"Error in stage one: {self.error}")
-            return self.async_show_form(
-                step_id="auth_choice",
-                data_schema=vol.Schema({
-                    vol.Required("auth_method", default="manual"): vol.In({
-                        "oauth2": "QR Code Authentication (Recommended)",
-                        "manual": "Manual JSESSIONID Entry"
-                    })
-                }),
-                errors={"base": self.error}
-            )
-        
-        _LOGGER.debug("Stage one successful, moving to auth_stage_two")
-        return self.async_show_progress_done(next_step_id="auth_stage_two")
 
     async def async_step_finish(self, user_input=None):
         """Prompt for JSESSIONID and create entry."""

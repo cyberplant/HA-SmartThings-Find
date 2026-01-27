@@ -22,4 +22,4 @@ BATTERY_LEVELS = {
 VERSION = "0.3.0-dev"
 # This will be automatically updated by git pre-commit hook
 BUILD_DATE = "2026-01-27"
-BUILD_INFO = "v0.3.0-dev-2026-01-27-39 (830cfde)"  # This line will be auto-updated
+BUILD_INFO = "v0.3.0-dev-2026-01-27-40 (f8e588b)"  # This line will be auto-updated
