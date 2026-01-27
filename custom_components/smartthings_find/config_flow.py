@@ -186,21 +186,26 @@ class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle OAuth2 authentication initialization."""
         _LOGGER.debug(f"async_step_auth_stage_one called with user_input: {user_input}")
         
+        if user_input is not None:
+            # This shouldn't happen, but just in case
+            return await self.async_step_auth_stage_one()
+        
         if not self.task_stage_one:
             _LOGGER.debug("Creating task_stage_one")
             self.task_stage_one = self.hass.async_create_task(self.do_stage_one())
         
-        if not self.task_stage_one.done():
-            _LOGGER.debug("Task not done, showing progress")
-            return self.async_show_progress(
-                progress_action="task_stage_one",
-                progress_task=self.task_stage_one,
-                description_placeholders={
-                    "message": "Initializing OAuth2 authentication..."
-                }
-            )
+        return self.async_show_progress(
+            progress_action="task_stage_one",
+            progress_task=self.task_stage_one,
+            description_placeholders={
+                "message": "Initializing OAuth2 authentication..."
+            }
+        )
+
+    async def async_progress_task_stage_one(self, user_input=None):
+        """Handle completion of OAuth2 authentication initialization."""
+        _LOGGER.debug("async_progress_task_stage_one called")
         
-        _LOGGER.debug("Task done, checking for errors")
         # Check if stage one completed successfully
         if self.error:
             _LOGGER.debug(f"Error in stage one: {self.error}")
