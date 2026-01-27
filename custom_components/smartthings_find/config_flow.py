@@ -114,6 +114,7 @@ class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle OAuth2 authentication completion."""
         if not self.task_stage_two:
             self.task_stage_two = self.hass.async_create_task(self.do_stage_two())
+        
         if not self.task_stage_two.done():
             return self.async_show_progress(
                 progress_action="task_stage_two",
@@ -124,6 +125,20 @@ class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     "code": self.qr_url.split('/')[-1] if self.qr_url else "Unknown",
                 }
             )
+        
+        # Check if stage two completed successfully
+        if self.error:
+            return self.async_show_form(
+                step_id="auth_choice",
+                data_schema=vol.Schema({
+                    vol.Required("auth_method", default="manual"): vol.In({
+                        "oauth2": "QR Code Authentication (Recommended)",
+                        "manual": "Manual JSESSIONID Entry"
+                    })
+                }),
+                errors={"base": self.error}
+            )
+        
         return self.async_show_progress_done(next_step_id="finish")
 
     async def async_step_user(self, user_input=None):
@@ -136,17 +151,7 @@ class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             auth_method = user_input.get("auth_method")
             if auth_method == "oauth2":
                 # Start OAuth2 flow
-                if not self.task_stage_one:
-                    self.task_stage_one = self.hass.async_create_task(self.do_stage_one())
-                if not self.task_stage_one.done():
-                    return self.async_show_progress(
-                        progress_action="task_stage_one",
-                        progress_task=self.task_stage_one,
-                        description_placeholders={
-                            "message": "Initializing OAuth2 authentication..."
-                        }
-                    )
-                return self.async_show_progress_done(next_step_id="auth_stage_two")
+                return await self.async_step_auth_stage_one()
             else:
                 # Use manual JSESSIONID entry
                 return await self.async_step_finish()
@@ -164,6 +169,35 @@ class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "message": "Choose your preferred authentication method. QR code authentication is more secure and easier to use."
             }
         )
+
+    async def async_step_auth_stage_one(self, user_input=None):
+        """Handle OAuth2 authentication initialization."""
+        if not self.task_stage_one:
+            self.task_stage_one = self.hass.async_create_task(self.do_stage_one())
+        
+        if not self.task_stage_one.done():
+            return self.async_show_progress(
+                progress_action="task_stage_one",
+                progress_task=self.task_stage_one,
+                description_placeholders={
+                    "message": "Initializing OAuth2 authentication..."
+                }
+            )
+        
+        # Check if stage one completed successfully
+        if self.error:
+            return self.async_show_form(
+                step_id="auth_choice",
+                data_schema=vol.Schema({
+                    vol.Required("auth_method", default="manual"): vol.In({
+                        "oauth2": "QR Code Authentication (Recommended)",
+                        "manual": "Manual JSESSIONID Entry"
+                    })
+                }),
+                errors={"base": self.error}
+            )
+        
+        return self.async_show_progress_done(next_step_id="auth_stage_two")
 
     async def async_step_finish(self, user_input=None):
         """Prompt for JSESSIONID and create entry."""
