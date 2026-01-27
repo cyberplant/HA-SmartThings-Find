@@ -7,6 +7,7 @@ from homeassistant.config_entries import (
     ConfigFlowResult,
     OptionsFlowWithConfigEntry
 )
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .const import (
     DOMAIN,
     CONF_JSESSIONID,
@@ -17,9 +18,19 @@ from .const import (
     CONF_ACTIVE_MODE_OTHERS,
     CONF_ACTIVE_MODE_OTHERS_DEFAULT
 )
-from .utils import do_login_stage_one
+from .utils import gen_qr_code_base64
+from .auth import (
+    get_entry_point,
+    create_signin_url,
+    decrypt_response,
+    get_user_auth_token,
+    get_api_token,
+    generate_code_challenge,
+    generate_state
+)
 import asyncio
 import logging
+from urllib.parse import parse_qs
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,62 +48,122 @@ class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     qr_url = None
     session = None
-
     jsessionid = None
-
-
+    
+    # New auth flow variables
+    code_verifier = None
+    auth_state = None
+    chk_do_num = None
+    auth_code = None
+    auth_server_url = None
+    api_token = None
+    
     error = None
 
     async def do_stage_one(self):
-        _LOGGER.debug("Running login stage 1")
+        """Initialize OAuth2 authentication flow."""
+        _LOGGER.debug("Starting OAuth2 authentication flow")
         try:
-            stage_one_res = await do_login_stage_one(self.hass)
-            if not stage_one_res is None:
-                self.session, self.qr_url = stage_one_res
-            else:
-                self.error = "Login stage 1 failed. Check logs for details."
-                _LOGGER.warn("Login stage 1 failed")
-            _LOGGER.debug("Login stage 1 done")
+            self.session = async_get_clientsession(self.hass)
+            
+            # Generate PKCE parameters
+            code_challenge, self.code_verifier = generate_code_challenge()
+            self.auth_state = generate_state()
+            
+            # Get entry point
+            entry_point = await get_entry_point(self.session)
+            
+            # Create sign-in URL
+            signin_url, state, chk_do_num = create_signin_url(
+                entry_point, code_challenge, self.auth_state
+            )
+            self.chk_do_num = chk_do_num
+            
+            # Generate QR code
+            self.qr_url = signin_url
+            _LOGGER.info(f"Generated QR URL for authentication")
+            
         except Exception as e:
-            self.error = "Login stage 1 failed. Check logs for details."
-            _LOGGER.error(f"Exception in stage 1: {e}", exc_info=True)
+            self.error = "Authentication initialization failed. Check logs for details."
+            _LOGGER.error(f"Exception in auth stage 1: {e}", exc_info=True)
 
-    # async def do_stage_two(self):
-    #     _LOGGER.debug("Running login stage 2")
-    #     try: 
-    #         stage_two_res = await do_login_stage_two(self.session)
-    #         if not stage_two_res is None:
-    #             self.jsessionid = stage_two_res
-    #             _LOGGER.info("Login successful")
-    #         else:
-    #             self.error = "Login stage 2 failed. Check logs for details."
-    #             _LOGGER.warning("Login stage 2 failed")
-    #         _LOGGER.debug("Login stage 2 done")
-    #     except Exception as e:
-    #         self.error = "Login stage 2 failed. Check logs for details."
-    #         _LOGGER.error(f"Exception in stage 2: {e}", exc_info=True)
+    async def do_stage_two(self):
+        """Complete OAuth2 authentication flow."""
+        _LOGGER.debug("Completing OAuth2 authentication flow")
+        try:
+            # For now, we'll need to simulate the callback from the redirect
+            # In a real implementation, this would handle the redirect callback
+            # For Home Assistant, we need to poll or use a different mechanism
+            
+            # This is a simplified version - in reality, we'd need to handle
+            # the OAuth2 callback properly within Home Assistant's constraints
+            
+            # For now, let's create a fallback to manual JSESSIONID entry
+            # until we can implement the full OAuth2 flow
+            self.error = "OAuth2 flow not fully implemented yet. Please use manual JSESSIONID entry."
+            _LOGGER.warning("OAuth2 flow not fully implemented")
+            
+        except Exception as e:
+            self.error = "Authentication completion failed. Check logs for details."
+            _LOGGER.error(f"Exception in auth stage 2: {e}", exc_info=True)
 
 
     
-    # # Second step: Wait until QR scanned an log in
-    # async def async_step_auth_stage_two(self, user_input=None):
-    #     if not self.task_stage_two:
-    #         self.task_stage_two = self.hass.async_create_task(self.do_stage_two())
-    #     if not self.task_stage_two.done():
-    #         return self.async_show_progress(
-    #             progress_action="task_stage_two",
-    #             progress_task=self.task_stage_two,
-    #             description_placeholders={
-    #                 "qr_code": gen_qr_code_base64(self.qr_url),
-    #                 "url": self.qr_url,
-    #                 "code": self.qr_url.split('/')[-1],
-    #             }
-    #         )
-    #     return self.async_show_progress_done(next_step_id="finish")
+    # Second step: Wait until QR scanned and log in
+    async def async_step_auth_stage_two(self, user_input=None):
+        """Handle OAuth2 authentication completion."""
+        if not self.task_stage_two:
+            self.task_stage_two = self.hass.async_create_task(self.do_stage_two())
+        if not self.task_stage_two.done():
+            return self.async_show_progress(
+                progress_action="task_stage_two",
+                progress_task=self.task_stage_two,
+                description_placeholders={
+                    "qr_code": gen_qr_code_base64(self.qr_url),
+                    "url": self.qr_url,
+                    "code": self.qr_url.split('/')[-1] if self.qr_url else "Unknown",
+                }
+            )
+        return self.async_show_progress_done(next_step_id="finish")
 
     async def async_step_user(self, user_input=None):
-        """Redirect to finish step immediately."""
-        return await self.async_step_finish(user_input)
+        """Start the authentication flow."""
+        return await self.async_step_auth_choice(user_input)
+    
+    async def async_step_auth_choice(self, user_input=None):
+        """Let user choose authentication method."""
+        if user_input is not None:
+            auth_method = user_input.get("auth_method")
+            if auth_method == "oauth2":
+                # Start OAuth2 flow
+                if not self.task_stage_one:
+                    self.task_stage_one = self.hass.async_create_task(self.do_stage_one())
+                if not self.task_stage_one.done():
+                    return self.async_show_progress(
+                        progress_action="task_stage_one",
+                        progress_task=self.task_stage_one,
+                        description_placeholders={
+                            "message": "Initializing OAuth2 authentication..."
+                        }
+                    )
+                return self.async_show_progress_done(next_step_id="auth_stage_two")
+            else:
+                # Use manual JSESSIONID entry
+                return await self.async_step_finish()
+        
+        data_schema = vol.Schema({
+            vol.Required("auth_method", default="manual"): vol.In({
+                "oauth2": "QR Code Authentication (Recommended)",
+                "manual": "Manual JSESSIONID Entry"
+            })
+        })
+        return self.async_show_form(
+            step_id="auth_choice",
+            data_schema=data_schema,
+            description_placeholders={
+                "message": "Choose your preferred authentication method. QR code authentication is more secure and easier to use."
+            }
+        )
 
     async def async_step_finish(self, user_input=None):
         """Prompt for JSESSIONID and create entry."""
@@ -111,24 +182,13 @@ class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="finish",
             data_schema=data_schema,
-            errors=errors
+            errors=errors,
+            description_placeholders={
+                "message": "Enter your JSESSIONID from the SmartThings Find website. See the README for instructions on how to obtain this."
+            }
         )
 
-    # async def async_step_finish(self, user_input=None):
-    #     if self.error:
-    #         return self.async_show_form(step_id="finish", errors={'base': self.error})
-    #     data={CONF_JSESSIONID: self.jsessionid}
-        
-    #     if self.reauth_entry:
-    #         # Finish step was called by reauth-flow. Do not create a new entry,
-    #         # instead update the existing entry
-    #         return self.async_update_reload_and_abort(
-    #             self.reauth_entry,
-    #             data=data
-    #         )
-        
-        # return self.async_create_entry(title="SmartThings Find", data=data)
-
+    
     async def async_step_reauth(self, user_input=None):
         self.reauth_entry = self.hass.config_entries.async_get_entry(
             self.context["entry_id"]
@@ -138,8 +198,11 @@ class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_reauth_confirm(self, user_input=None):
         if user_input is None:
             return self.async_show_form(
-                step_id="user",
+                step_id="auth_choice",
                 data_schema=vol.Schema({}),
+                description_placeholders={
+                    "message": "Re-authentication required. Please choose your authentication method."
+                }
             )
         return await self.async_step_user()
     

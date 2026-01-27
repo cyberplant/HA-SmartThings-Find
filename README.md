@@ -1,6 +1,3 @@
-# ⚠️ Original Repository archived - forked repository with login alternative quick fix ⚠️
-Unfortunately, I no longer have the time to maintain this repository. I underestimated how much work it would be. Additionally, my focus recently has shifted away from HA (and programming in general) towards other things. I sincerely hope someone else can take over and build a solid, reliable integration from what's already here.
-
 # SmartThings Find Integration for Home Assistant
 
 This integration adds support for devices from Samsung SmartThings Find. While intended mainly for Samsung SmartTags, it also works with other devices, such as phones, tablets, watches and earbuds.
@@ -14,6 +11,9 @@ Currently the integration creates three entities for each device:
 
 This integration does **not** allow you to perform actions based on button presses on the SmartTag! There are other ways to do that.
 
+## Repository Lineage
+
+This repository is a fork of a fork. The original repository by [Vedeneb](https://github.com/Vedeneb/HA-SmartThings-Find) was archived, so it was forked by [tomskra](https://github.com/tomskra/HA-SmartThings-Find) to continue maintenance. This current fork by [cyberplant](https://github.com/cyberplant/HA-SmartThings-Find) adds new features and improvements.
 
 ## ⚠️ Warning/Disclaimer ⚠️
 
@@ -22,7 +22,30 @@ This integration does **not** allow you to perform actions based on button press
 - **Feature Constraints**: The integration can only support features available on the [SmartThings Find website](https://smartthingsfind.samsung.com/). For instance, stopping a SmartTag from ringing is not possible due to API limitations (while other devices do support this; not yet implemented)
 
 ## Notes on authentication
-The integration simulates Samsung login using QR code. It stores the retrieved JSESSIONID-Cookie and uses it for further requests. **It is not yet known, how long exactly the session is valid!** While it did work at least for several weeks for me and others, there's no definite answer and the session might become invalid anytime! As a precaution I implemented a reauth-flow: In case the session expires, Home Assistant will inform you and you can easily repeat the QR code login process.
+
+This integration supports two authentication methods:
+
+### QR Code Authentication (Recommended)
+The integration now supports proper OAuth2 authentication using QR codes, similar to the official SmartThings Find website. This method is more secure and user-friendly:
+
+1. During setup, choose "QR Code Authentication"
+2. A QR code will be displayed in Home Assistant
+3. Scan the QR code with your Samsung device's camera or SmartThings app
+4. Approve the login on your device
+5. The integration will automatically complete the authentication
+
+**Note**: The QR code authentication is currently in development and may fall back to manual JSESSIONID entry.
+
+### Manual JSESSIONID Entry (Legacy)
+If QR code authentication is not available, you can manually obtain the JSESSIONID:
+
+1. Visit https://smartthingsfind.samsung.com/ and log in with your Samsung account
+2. Open Developer Tools in your browser
+3. Go to the Application/Storage tab and find cookies for smartthingsfind.samsung.com
+4. Copy the JSESSIONID value
+5. Enter this value in Home Assistant when prompted
+
+**Session Validity**: The JSESSIONID session may expire over time. If you encounter authentication issues, Home Assistant will prompt you to re-authenticate.
 
 ## Notes on connection to the devices
 Being able to let a SmartTag ring depends on a phone/tablet nearby which forwards your request via Bluetooth. If your phone is not near your tag, you can't make it ring. The location should still update if any Galaxy device is nearby. 
@@ -40,9 +63,9 @@ By default active mode is enabled for SmartTags but disabled for any other devic
 
 ### Using HACS
 
-1. Add this repository as a custom repository in HACS. Either by manually adding `https://github.com/tomskra/HA-SmartThings-Find` with category `integration` or simply click the following button:
+1. Add this repository as a custom repository in HACS. Either by manually adding `https://github.com/cyberplant/HA-SmartThings-Find` with category `integration` or simply click the following button:
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=tomskra&repository=HA-SmartThings-Find&category=integration)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=cyberplant&repository=HA-SmartThings-Find&category=integration)
 
 2. Search for "SmartThings Find" in HACS and install the integration
 3. Restart Home Assistant
@@ -58,14 +81,22 @@ By default active mode is enabled for SmartTags but disabled for any other devic
 
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=smartthings_find)
 
-1. Go to the Integrations page  
-2. Search for "SmartThings *Find*" (**do not confuse this with the built-in SmartThings integration!**)  
-3. Visit https://smartthingsfind.samsung.com/ and log in with your Samsung account.  
-4. Open Developer Tools in your browser.  
-5. Follow the instructions below and copy the JSESSIONID value:  
-![screenshot](media/alternative_login_flow.png)  
-6. Enter your JSESSIONID into Home Assistant.  
-7. Wait a few seconds for the integration to be ready.
+1. Go to the Integrations page in Home Assistant
+2. Search for "SmartThings *Find*" (**do not confuse this with the built-in SmartThings integration!**)
+3. Choose your authentication method:
+   - **QR Code Authentication (Recommended)**: Follow the on-screen instructions to scan the QR code with your Samsung device
+   - **Manual JSESSIONID Entry**: Follow the steps below to obtain your JSESSIONID
+
+### For Manual JSESSIONID Entry:
+4. Visit https://smartthingsfind.samsung.com/ and log in with your Samsung account
+5. Open Developer Tools in your browser (F12 or Ctrl+Shift+I)
+6. Go to the Application/Storage tab and find cookies for smartthingsfind.samsung.com
+7. Copy the JSESSIONID value
+8. Enter this value in Home Assistant when prompted
+9. Wait a few seconds for the integration to be ready
+
+### Re-authentication
+If your session expires, Home Assistant will automatically prompt you to re-authenticate. Simply follow the same process you used during initial setup.
 
 ## Debugging
 
