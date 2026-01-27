@@ -124,7 +124,8 @@ class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # In the future, we could poll for completion here
             return await self.async_step_finish()
         
-        # Show form with QR code info
+        # Generate QR code
+        qr_code_base64 = gen_qr_code_base64(self.qr_url) if self.qr_url else ""
         _LOGGER.debug(f"Showing QR code form, URL: {self.qr_url[:50] if self.qr_url else 'None'}...")
         
         return self.async_show_form(
@@ -132,7 +133,7 @@ class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema({}),
             description_placeholders={
                 "qr_url": self.qr_url or "Error generating QR URL",
-                "message": "Scan the QR code with your Samsung device, or copy the URL. After authenticating, click Submit to continue with manual JSESSIONID entry."
+                "qr_code": qr_code_base64,
             }
         )
 

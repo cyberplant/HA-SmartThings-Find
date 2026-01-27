@@ -13,7 +13,7 @@
       },
       "auth_stage_two": {
         "title": "Scan QR Code",
-        "description": "Open this URL on your Samsung device or scan the QR code:\n\n**{qr_url}**\n\nAfter authenticating, click Submit to continue with manual JSESSIONID entry."
+        "description": "Scan the QR code with your Samsung phone's camera or SmartThings app:\n\n![QR Code](data:image/png;base64,{qr_code})\n\n**Or open this URL on your Samsung device:**\n\n{qr_url}\n\n*Note: This URL only works on Samsung devices. After authenticating, click Submit.*"
       },
       "finish": {
         "title": "Enter JSESSIONID",
