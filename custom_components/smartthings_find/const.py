@@ -20,6 +20,6 @@ BATTERY_LEVELS = {
 
 # Version information for debugging
 VERSION = "0.3.0-dev"
-# This will be updated manually when we make significant changes
+# This will be automatically updated by git pre-commit hook
 BUILD_DATE = "2026-01-27"
-BUILD_INFO = f"v{VERSION}-{BUILD_DATE}"
+BUILD_INFO = "v0.3.0-dev-2026-01-27-38 (cb39420)"  # This line will be auto-updated
