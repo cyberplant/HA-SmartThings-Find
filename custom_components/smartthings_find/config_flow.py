@@ -16,7 +16,9 @@ from .const import (
     CONF_ACTIVE_MODE_SMARTTAGS,
     CONF_ACTIVE_MODE_SMARTTAGS_DEFAULT,
     CONF_ACTIVE_MODE_OTHERS,
-    CONF_ACTIVE_MODE_OTHERS_DEFAULT
+    CONF_ACTIVE_MODE_OTHERS_DEFAULT,
+    VERSION,
+    COMMIT_HASH
 )
 from .utils import gen_qr_code_base64
 from .auth import (
@@ -34,6 +36,9 @@ from urllib.parse import parse_qs
 
 
 _LOGGER = logging.getLogger(__name__)
+
+# Log version information on import
+_LOGGER.info(f"SmartThings Find Integration v{VERSION} (commit: {COMMIT_HASH})")
 
 class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for SmartThings Find."""
@@ -147,13 +152,19 @@ class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     
     async def async_step_auth_choice(self, user_input=None):
         """Let user choose authentication method."""
+        _LOGGER.debug(f"async_step_auth_choice called with user_input: {user_input}")
+        
         if user_input is not None:
             auth_method = user_input.get("auth_method")
+            _LOGGER.debug(f"Selected auth method: {auth_method}")
+            
             if auth_method == "oauth2":
                 # Start OAuth2 flow
+                _LOGGER.debug("Starting OAuth2 flow - moving to auth_stage_one")
                 return await self.async_step_auth_stage_one()
             else:
                 # Use manual JSESSIONID entry
+                _LOGGER.debug("Using manual JSESSIONID entry - moving to finish")
                 return await self.async_step_finish()
         
         data_schema = vol.Schema({
@@ -162,6 +173,7 @@ class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "manual": "Manual JSESSIONID Entry"
             })
         })
+        _LOGGER.debug("Showing auth choice form")
         return self.async_show_form(
             step_id="auth_choice",
             data_schema=data_schema,
@@ -172,10 +184,14 @@ class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_auth_stage_one(self, user_input=None):
         """Handle OAuth2 authentication initialization."""
+        _LOGGER.debug(f"async_step_auth_stage_one called with user_input: {user_input}")
+        
         if not self.task_stage_one:
+            _LOGGER.debug("Creating task_stage_one")
             self.task_stage_one = self.hass.async_create_task(self.do_stage_one())
         
         if not self.task_stage_one.done():
+            _LOGGER.debug("Task not done, showing progress")
             return self.async_show_progress(
                 progress_action="task_stage_one",
                 progress_task=self.task_stage_one,
@@ -184,8 +200,10 @@ class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 }
             )
         
+        _LOGGER.debug("Task done, checking for errors")
         # Check if stage one completed successfully
         if self.error:
+            _LOGGER.debug(f"Error in stage one: {self.error}")
             return self.async_show_form(
                 step_id="auth_choice",
                 data_schema=vol.Schema({
@@ -197,6 +215,7 @@ class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors={"base": self.error}
             )
         
+        _LOGGER.debug("Stage one successful, moving to auth_stage_two")
         return self.async_show_progress_done(next_step_id="auth_stage_two")
 
     async def async_step_finish(self, user_input=None):
