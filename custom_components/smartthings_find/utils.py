@@ -8,6 +8,7 @@ import random
 import string
 import re
 import html
+import qrcode
 from io import BytesIO
 from datetime import datetime, timedelta
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
