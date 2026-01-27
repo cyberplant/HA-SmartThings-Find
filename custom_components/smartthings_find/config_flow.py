@@ -18,7 +18,7 @@ from .const import (
     CONF_ACTIVE_MODE_OTHERS,
     CONF_ACTIVE_MODE_OTHERS_DEFAULT,
     VERSION,
-    COMMIT_HASH
+    BUILD_INFO
 )
 from .utils import gen_qr_code_base64
 from .auth import (
@@ -38,7 +38,7 @@ from urllib.parse import parse_qs
 _LOGGER = logging.getLogger(__name__)
 
 # Log version information on import
-_LOGGER.info(f"SmartThings Find Integration v{VERSION} (commit: {COMMIT_HASH})")
+_LOGGER.info(f"SmartThings Find Integration {BUILD_INFO}")
 
 class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for SmartThings Find."""

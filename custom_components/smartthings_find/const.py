@@ -20,14 +20,6 @@ BATTERY_LEVELS = {
 
 # Version information for debugging
 VERSION = "0.3.0-dev"
-
-def get_commit_hash():
-    """Get the current git commit hash."""
-    try:
-        import subprocess
-        return subprocess.check_output(['git', 'rev-parse', 'HEAD'], 
-                                      cwd=__file__.rsplit('/', 3)[0]).decode().strip()
-    except:
-        return "unknown"
-
-COMMIT_HASH = get_commit_hash()
+# This will be updated manually when we make significant changes
+BUILD_DATE = "2026-01-27"
+BUILD_INFO = f"v{VERSION}-{BUILD_DATE}"
